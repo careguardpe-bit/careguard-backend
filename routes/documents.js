@@ -42,18 +42,12 @@ const upload = multer({
 });
 
 // POST /api/documents - Subir documento
-router.post('/', upload.single('document'), async (req, res) => {
+// POST /api/documents/metadata - Guardar metadatos (archivo ya está en Hostinger)
+router.post('/metadata', async (req, res) => {
   try {
-    const { user_email, document_type } = req.body;
-    
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'No se recibió ningún archivo'
-      });
-    }
+    const { user_email, document_type, filename, original_name, file_size, mime_type, file_url } = req.body;
 
-    // Buscar usuario por email
+    // Buscar usuario
     const userResult = await pool.query('SELECT id FROM users WHERE email = $1', [user_email]);
     
     if (userResult.rows.length === 0) {
@@ -65,10 +59,10 @@ router.post('/', upload.single('document'), async (req, res) => {
 
     const userId = userResult.rows[0].id;
 
-    // Eliminar documento anterior del mismo tipo si existe
+    // Eliminar documento anterior del mismo tipo
     await pool.query('DELETE FROM documents WHERE user_id = $1 AND document_type = $2', [userId, document_type]);
 
-    // Guardar nuevo documento
+    // Guardar metadatos
     const insertQuery = `
       INSERT INTO documents (user_id, document_type, filename, original_name, file_size, mime_type, file_path)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -78,25 +72,24 @@ router.post('/', upload.single('document'), async (req, res) => {
     const result = await pool.query(insertQuery, [
       userId,
       document_type,
-      req.file.filename,
-      req.file.originalname,
-      req.file.size,
-      req.file.mimetype,
-      req.file.path
+      filename,
+      original_name,
+      file_size,
+      mime_type,
+      file_url
     ]);
 
     res.status(200).json({
       success: true,
       data: result.rows[0],
-      message: 'Documento subido correctamente'
+      message: 'Documento registrado correctamente'
     });
 
   } catch (error) {
-    console.error('Error subiendo documento:', error);
+    console.error('Error guardando metadatos:', error);
     res.status(500).json({
       success: false,
-      message: 'Error al subir documento',
-      error: error.message
+      message: 'Error al registrar documento'
     });
   }
 });
