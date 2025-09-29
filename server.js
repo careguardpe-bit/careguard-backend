@@ -3,10 +3,26 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const multer = require('multer'); // <-- AGREGAR ESTA LÍNEA
+const fs = require('fs');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configurar storage de multer
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = './uploads/documents';
+    // Crear carpeta si no existe
+    fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.name));
+  }
+});
+
+const upload = multer({ storage: storage });
 
 // Middlewares
 app.use(cors({
