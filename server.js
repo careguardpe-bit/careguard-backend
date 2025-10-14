@@ -28,8 +28,8 @@ const upload = multer({ storage: storage });
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://postulaciones.careguard.es',
-    'https://soycareguard.careguard.es'
+    'https://www.unete.careguard.es',
+    'https://unete.careguard.es'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
