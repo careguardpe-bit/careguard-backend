@@ -8,7 +8,7 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ⭐ CONFIGURACIÓN DE CORS - CRÍTICO
+// CONFIGURACIÓN DE CORS - CRÍTICO
 const corsOptions = {
   origin: [
     'https://unete.careguard.es',
