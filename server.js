@@ -8,14 +8,21 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // Middlewares
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Servir archivos estáticos (frontend)
-app.use(express.static(path.join(__dirname, '../frontend')));
+// SOLO servir frontend en desarrollo local, NO en producción (Render)
+if (NODE_ENV === 'development') {
+  // Servir archivos estáticos (frontend) solo en desarrollo
+  app.use(express.static(path.join(__dirname, '../frontend')));
+  console.log('🔧 Modo desarrollo: Sirviendo frontend desde backend');
+} else {
+  console.log('🚀 Modo producción: Backend solo sirve API');
+}
 
 // Servir archivos subidos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -25,7 +32,6 @@ const userRoutes = require('./routes/users');
 const documentRoutes = require('./routes/documents');
 const submissionRoutes = require('./routes/submissions');
 const countryRoutes = require('./routes/country');
-
 
 // Usar rutas de la API
 app.use('/api/users', userRoutes);
@@ -39,7 +45,8 @@ app.get('/api/test', (req, res) => {
     success: true, 
     message: 'API funcionando correctamente',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.0',
+    environment: NODE_ENV
   });
 });
 
@@ -101,14 +108,43 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// Ruta principal - servir el frontend
+// Ruta raíz - EN PRODUCCIÓN solo devuelve info de la API
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+  if (NODE_ENV === 'production') {
+    // En producción, devolver info de la API
+    res.json({
+      success: true,
+      message: 'Careguard API - Backend',
+      version: '1.0.0',
+      environment: 'production',
+      endpoints: {
+        test: '/api/test',
+        database: '/test-db',
+        stats: '/api/stats',
+        users: '/api/users',
+        documents: '/api/documents',
+        submissions: '/api/submissions',
+        countries: '/api/countries'
+      },
+      frontend: 'https://unete.careguard.com.pe',
+      documentation: 'https://careguard-backend.onrender.com/api/test'
+    });
+  } else {
+    // En desarrollo, servir el frontend
+    res.sendFile(path.join(__dirname, '../frontend/index.html'), (err) => {
+      if (err) {
+        res.status(500).json({
+          success: false,
+          message: 'Frontend no encontrado. Asegúrate de que existe la carpeta /frontend'
+        });
+      }
+    });
+  }
 });
 
 // Middleware de manejo de errores
 app.use((err, req, res, next) => {
-  console.error('Error del servidor:', err.stack);
+  console.error('Error del servidor:', err);
   
   // Error de Multer (archivos)
   if (err instanceof multer.MulterError) {
@@ -126,16 +162,25 @@ app.use((err, req, res, next) => {
 });
 
 // Manejo de rutas no encontradas
-app.get('*', (req, res) => {
+app.use('*', (req, res) => {
   // Si es una ruta de API, devolver JSON
-  if (req.path.startsWith('/api/')) {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/test-')) {
     return res.status(404).json({
       success: false,
-      message: 'Endpoint no encontrado'
+      message: 'Endpoint no encontrado',
+      path: req.path
     });
   }
   
-  // Para otras rutas, intentar servir el index.html (SPA)
+  // En producción, redirigir al frontend en Hostinger
+  if (NODE_ENV === 'production') {
+    return res.status(404).json({
+      success: false,
+      message: 'Esta es una API backend. El frontend está en https://unete.careguard.com.pe'
+    });
+  }
+  
+  // En desarrollo, intentar servir el index.html
   res.sendFile(path.join(__dirname, '../frontend/index.html'), (err) => {
     if (err) {
       res.status(404).json({
@@ -148,30 +193,35 @@ app.get('*', (req, res) => {
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`Sirviendo frontend desde: ${path.resolve(__dirname, '../frontend')}`);
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+  console.log(`📦 Entorno: ${NODE_ENV}`);
   
-  // Solo Railway PostgreSQL
-  console.log(`Base de datos: Railway PostgreSQL`);
+  if (NODE_ENV === 'development') {
+    console.log(`🌐 Frontend: http://localhost:${PORT}`);
+  } else {
+    console.log(`🌐 Frontend: https://unete.careguard.com.pe`);
+  }
   
-  console.log(`API endpoints disponibles:`);
+  console.log(`💾 Base de datos: Railway PostgreSQL`);
+  console.log(`\n📡 API Endpoints disponibles:`);
   console.log(`   - GET  /api/test`);
   console.log(`   - GET  /test-db`);
   console.log(`   - GET  /api/stats`);
   console.log(`   - POST /api/users`);
-  console.log(`   - GET  /api/users`);
+  console.log(`   - GET  /api/users/:email`);
   console.log(`   - POST /api/documents`);
   console.log(`   - POST /api/submissions`);
-  console.log(`Documentación: http://localhost:${PORT}/api/test`);
+  console.log(`   - GET  /api/countries`);
+  console.log(`   - POST /api/countries/select`);
 });
 
 // Manejo graceful del cierre del servidor
 process.on('SIGTERM', () => {
-  console.log(' Cerrando servidor...');
+  console.log('\n⏹️  Cerrando servidor...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log(' Cerrando servidor...');
+  console.log('\n⏹️  Cerrando servidor...');
   process.exit(0);
 });
