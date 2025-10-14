@@ -5,15 +5,7 @@ const pool = require('../config/database');
 // POST /api/users - Guardar información personal
 router.post('/', async (req, res) => {
   try {
-    const { nombre, email, telefono, direccion, especialidades, video_confirmado, country_id } = req.body;
-    
-    // Validar que country_id esté presente
-    if (!country_id) {
-      return res.status(400).json({
-        success: false,
-        message: 'El país es requerido'
-      });
-    }
+    const { nombre, email, telefono, direccion, especialidades, video_confirmado } = req.body;
     
     // Verificar si el usuario ya existe
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -24,36 +16,20 @@ router.post('/', async (req, res) => {
       const updateQuery = `
         UPDATE users 
         SET nombre = $1, telefono = $2, direccion = $3, especialidades = $4, 
-            video_confirmado = $5, country_id = $6, updated_at = CURRENT_TIMESTAMP
-        WHERE email = $7
+            video_confirmado = $5, updated_at = CURRENT_TIMESTAMP
+        WHERE email = $6
         RETURNING *
       `;
-      const result = await pool.query(updateQuery, [
-        nombre, 
-        telefono, 
-        direccion, 
-        especialidades, 
-        video_confirmado, 
-        country_id, 
-        email
-      ]);
+      const result = await pool.query(updateQuery, [nombre, telefono, direccion, especialidades, video_confirmado, email]);
       user = result.rows[0];
     } else {
       // Crear nuevo usuario
       const insertQuery = `
-        INSERT INTO users (nombre, email, telefono, direccion, especialidades, video_confirmado, country_id)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO users (nombre, email, telefono, direccion, especialidades, video_confirmado)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING *
       `;
-      const result = await pool.query(insertQuery, [
-        nombre, 
-        email, 
-        telefono, 
-        direccion, 
-        especialidades, 
-        video_confirmado, 
-        country_id
-      ]);
+      const result = await pool.query(insertQuery, [nombre, email, telefono, direccion, especialidades, video_confirmado]);
       user = result.rows[0];
     }
     
@@ -73,16 +49,10 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/users/:email - Obtener usuario por email (con información del país)
+// GET /api/users/:email - Obtener usuario por email
 router.get('/:email', async (req, res) => {
   try {
-    const query = `
-      SELECT u.*, c.country as country_name
-      FROM users u
-      LEFT JOIN country c ON u.country_id = c.id
-      WHERE u.email = $1
-    `;
-    const result = await pool.query(query, [req.params.email]);
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [req.params.email]);
     
     if (result.rows.length === 0) {
       return res.status(404).json({
