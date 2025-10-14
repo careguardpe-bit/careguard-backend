@@ -1,45 +1,31 @@
-// Agregar esta línea al inicio del server.js
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
-const multer = require('multer'); // <-- AGREGAR ESTA LÍNEA
-const fs = require('fs');
+const multer = require('multer'); 
+
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Configurar storage de multer
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    const uploadPath = './uploads/documents';
-    // Crear carpeta si no existe
-    fs.mkdirSync(uploadPath, { recursive: true });
-    cb(null, uploadPath);
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.name));
-  }
-});
-
-const upload = multer({ storage: storage });
-
-// Middlewares
-app.use(cors({
+// ⭐ CONFIGURACIÓN DE CORS - CRÍTICO
+const corsOptions = {
   origin: [
-    'http://localhost:3000',
+    'https://unete.careguard.es',
     'https://www.unete.careguard.es',
-    'https://unete.careguard.es'
+    'http://localhost:5500',
+    'http://localhost:3000',
+    'http://127.0.0.1:5500'
   ],
   credentials: true,
+  optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
-}));
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Servir archivos estáticos (frontend)
-app.use(express.static(path.join(__dirname, '../frontend')));
 
 // Servir archivos subidos
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -48,11 +34,13 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 const userRoutes = require('./routes/users');
 const documentRoutes = require('./routes/documents');
 const submissionRoutes = require('./routes/submissions');
+const countryRoutes = require('./routes/country');
 
 // Usar rutas de la API
 app.use('/api/users', userRoutes);
 app.use('/api/documents', documentRoutes);
 app.use('/api/submissions', submissionRoutes);
+app.use('/api/countries', countryRoutes);
 
 // Rutas de prueba
 app.get('/api/test', (req, res) => {
@@ -60,7 +48,8 @@ app.get('/api/test', (req, res) => {
     success: true, 
     message: 'API funcionando correctamente',
     timestamp: new Date().toISOString(),
-    version: '1.0.0'
+    version: '1.0.0',
+    cors_enabled: true
   });
 });
 
@@ -122,14 +111,32 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// Ruta principal - servir el frontend
+// Ruta principal - info de la API
 app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+  res.json({
+    success: true,
+    message: 'Careguard API - Backend',
+    version: '1.0.0',
+    cors_enabled: true,
+    allowed_origins: [
+      'https://unete.careguard.es',
+      'https://www.unete.careguard.es'
+    ],
+    endpoints: {
+      test: '/api/test',
+      database: '/test-db',
+      stats: '/api/stats',
+      users: '/api/users',
+      documents: '/api/documents',
+      submissions: '/api/submissions',
+      countries: '/api/countries'
+    }
+  });
 });
 
 // Middleware de manejo de errores
 app.use((err, req, res, next) => {
-  console.error('Error del servidor:', err.stack);
+  console.error('Error del servidor:', err);
   
   // Error de Multer (archivos)
   if (err instanceof multer.MulterError) {
@@ -147,52 +154,45 @@ app.use((err, req, res, next) => {
 });
 
 // Manejo de rutas no encontradas
-app.get('*', (req, res) => {
-  // Si es una ruta de API, devolver JSON
-  if (req.path.startsWith('/api/')) {
+app.use('*', (req, res) => {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/test-')) {
     return res.status(404).json({
       success: false,
-      message: 'Endpoint no encontrado'
+      message: 'Endpoint no encontrado',
+      path: req.path
     });
   }
   
-  // Para otras rutas, intentar servir el index.html (SPA)
-  res.sendFile(path.join(__dirname, '../frontend/index.html'), (err) => {
-    if (err) {
-      res.status(404).json({
-        success: false,
-        message: 'Página no encontrada'
-      });
-    }
+  res.status(404).json({
+    success: false,
+    message: 'Esta es una API backend. El frontend está en https://unete.careguard.es'
   });
 });
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}`);
-  console.log(`Sirviendo frontend desde: ${path.resolve(__dirname, '../frontend')}`);
-  
-  // Solo Railway PostgreSQL
-  console.log(`Base de datos: Railway PostgreSQL`);
-  
-  console.log(`API endpoints disponibles:`);
+  console.log(`🚀 Servidor corriendo en puerto ${PORT}`);
+  console.log(`💾 Base de datos: Railway PostgreSQL`);
+  console.log(`🌐 CORS habilitado para: https://unete.careguard.es`);
+  console.log(`\n📡 API Endpoints disponibles:`);
   console.log(`   - GET  /api/test`);
   console.log(`   - GET  /test-db`);
   console.log(`   - GET  /api/stats`);
   console.log(`   - POST /api/users`);
-  console.log(`   - GET  /api/users`);
+  console.log(`   - GET  /api/users/:email`);
   console.log(`   - POST /api/documents`);
   console.log(`   - POST /api/submissions`);
-  console.log(`Documentación: http://localhost:${PORT}/api/test`);
+  console.log(`   - GET  /api/countries`);
+  console.log(`   - POST /api/countries/select`);
 });
 
 // Manejo graceful del cierre del servidor
 process.on('SIGTERM', () => {
-  console.log(' Cerrando servidor...');
+  console.log('\n⏹️  Cerrando servidor...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log(' Cerrando servidor...');
+  console.log('\n⏹️  Cerrando servidor...');
   process.exit(0);
 });
