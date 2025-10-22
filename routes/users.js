@@ -5,15 +5,42 @@ const pool = require('../config/database');
 // POST /api/users - Guardar información personal
 router.post('/', async (req, res) => {
   try {
-    const { nombre, email, telefono, direccion, especialidades, video_confirmado, country_id } = req.body;
+    const { 
+      nombre, 
+      email, 
+      telefono, 
+      direccion, 
+      especialidades, 
+      video_confirmado,
+      country_id 
+    } = req.body;
     
-    // Validar que country_id esté presente
+    console.log('📥 Datos recibidos:', req.body); // Debug
+    
+    // Validar campos requeridos
     if (!country_id) {
       return res.status(400).json({
         success: false,
         message: 'El país es requerido'
       });
     }
+    
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'El email es requerido'
+      });
+    }
+    
+    // 🔥 Asegurar que especialidades sea un string JSON
+    let especialidadesStr = especialidades;
+    if (Array.isArray(especialidades)) {
+      especialidadesStr = JSON.stringify(especialidades);
+    } else if (typeof especialidades === 'object') {
+      especialidadesStr = JSON.stringify(especialidades);
+    }
+    
+    console.log('📝 Especialidades procesadas:', especialidadesStr); // Debug
     
     // Verificar si el usuario ya existe
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -32,12 +59,14 @@ router.post('/', async (req, res) => {
         nombre, 
         telefono, 
         direccion, 
-        especialidades, 
+        especialidadesStr,  // 🔥 String JSON
         video_confirmado, 
         country_id, 
         email
       ]);
       user = result.rows[0];
+      
+      console.log('✅ Usuario actualizado:', user.email);
     } else {
       // Crear nuevo usuario
       const insertQuery = `
@@ -50,11 +79,13 @@ router.post('/', async (req, res) => {
         email, 
         telefono, 
         direccion, 
-        especialidades, 
+        especialidadesStr,  // 🔥 String JSON
         video_confirmado, 
         country_id
       ]);
       user = result.rows[0];
+      
+      console.log('✅ Usuario creado:', user.email);
     }
     
     res.status(200).json({
@@ -64,7 +95,8 @@ router.post('/', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('Error en /api/users:', error);
+    console.error('❌ Error en /api/users:', error);
+    console.error('Stack:', error.stack);
     res.status(500).json({
       success: false,
       message: 'Error al guardar usuario',
