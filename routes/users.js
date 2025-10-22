@@ -15,7 +15,7 @@ router.post('/', async (req, res) => {
       country_id 
     } = req.body;
     
-    console.log('📥 Datos recibidos:', req.body); // Debug
+    console.log('📥 Datos recibidos:', req.body);
     
     // Validar campos requeridos
     if (!country_id) {
@@ -32,15 +32,12 @@ router.post('/', async (req, res) => {
       });
     }
     
-    // 🔥 Asegurar que especialidades sea un string JSON
-    let especialidadesStr = especialidades;
-    if (Array.isArray(especialidades)) {
-      especialidadesStr = JSON.stringify(especialidades);
-    } else if (typeof especialidades === 'object') {
-      especialidadesStr = JSON.stringify(especialidades);
-    }
+    // 🔥 Para JSONB, enviar el array/objeto directamente
+    // PostgreSQL automáticamente lo convierte a JSONB
+    const especialidadesData = especialidades || [];
     
-    console.log('📝 Especialidades procesadas:', especialidadesStr); // Debug
+    console.log('📝 Especialidades:', especialidadesData);
+    console.log('📝 Tipo:', typeof especialidadesData);
     
     // Verificar si el usuario ya existe
     const existingUser = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
@@ -50,8 +47,13 @@ router.post('/', async (req, res) => {
       // Actualizar usuario existente
       const updateQuery = `
         UPDATE users 
-        SET nombre = $1, telefono = $2, direccion = $3, especialidades = $4, 
-            video_confirmado = $5, country_id = $6, updated_at = CURRENT_TIMESTAMP
+        SET nombre = $1, 
+            telefono = $2, 
+            direccion = $3, 
+            especialidades = $4, 
+            video_confirmado = $5, 
+            country_id = $6, 
+            updated_at = CURRENT_TIMESTAMP
         WHERE email = $7
         RETURNING *
       `;
@@ -59,7 +61,7 @@ router.post('/', async (req, res) => {
         nombre, 
         telefono, 
         direccion, 
-        especialidadesStr,  // 🔥 String JSON
+        JSON.stringify(especialidadesData), // 🔥 PostgreSQL acepta JSON string para JSONB
         video_confirmado, 
         country_id, 
         email
@@ -79,7 +81,7 @@ router.post('/', async (req, res) => {
         email, 
         telefono, 
         direccion, 
-        especialidadesStr,  // 🔥 String JSON
+        JSON.stringify(especialidadesData), // 🔥 PostgreSQL acepta JSON string para JSONB
         video_confirmado, 
         country_id
       ]);
